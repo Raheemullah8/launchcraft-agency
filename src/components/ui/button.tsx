@@ -9,6 +9,7 @@ export interface ButtonProps
   href?: string;
   target?: string;
   rel?: string;
+  onClick?: React.MouseEventHandler<HTMLElement>;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -65,6 +66,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           target={target}
           rel={rel}
           className={combinedClassName}
+          {...(props as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
         >
           {children}
         </a>

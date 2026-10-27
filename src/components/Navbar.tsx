@@ -33,6 +33,42 @@ export function Navbar() {
 
   const closeMenu = () => setIsOpen(false);
 
+  const handleNavClick = (
+    e: React.MouseEvent<HTMLElement>,
+    href: string
+  ) => {
+    if (href.startsWith("#")) {
+      e.preventDefault();
+      setIsOpen(false);
+
+      const targetId = href.replace("#", "");
+      if (!targetId) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.history.pushState(null, "", window.location.pathname);
+        return;
+      }
+
+      // Small delay to allow the drawer to close cleanly before scrolling
+      setTimeout(() => {
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          const navOffset = 75;
+          const elementPosition = targetElement.getBoundingClientRect().top + window.scrollY;
+          const offsetPosition = Math.max(0, elementPosition - navOffset);
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth",
+          });
+
+          window.history.pushState(null, "", href);
+        }
+      }, 50);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
       {/* Top Special Offer Announcement Bar */}
@@ -46,6 +82,7 @@ export function Navbar() {
           </span>
           <a
             href="#contact"
+            onClick={(e) => handleNavClick(e, "#contact")}
             className="hidden sm:inline-flex items-center gap-1 font-semibold text-[#95B47C] hover:text-white underline underline-offset-2 ml-1"
           >
             Claim Yours
@@ -67,6 +104,7 @@ export function Navbar() {
             {/* Brand Logo */}
             <Link
               href="#"
+              onClick={(e) => handleNavClick(e, "#")}
               className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A9A60] rounded-xl"
             >
               <div className="h-10 w-10 rounded-xl bg-[#2C4018] flex items-center justify-center text-[#F2F7F1] shadow-xs transition-transform duration-300 group-hover:scale-105 group-hover:bg-[#3D5922]">
@@ -88,6 +126,7 @@ export function Navbar() {
                 <a
                   key={link.name}
                   href={link.href}
+                  onClick={(e) => handleNavClick(e, link.href)}
                   className="px-4 py-1.5 text-sm font-medium text-[#1E293B] hover:text-[#2C4018] rounded-full transition-all duration-200 hover:bg-white hover:shadow-xs"
                 >
                   {link.name}
@@ -108,7 +147,12 @@ export function Navbar() {
                 <span>DM Us</span>
               </a>
 
-              <Button href="#contact" variant="default" size="default">
+              <Button
+                href="#contact"
+                onClick={(e) => handleNavClick(e, "#contact")}
+                variant="default"
+                size="default"
+              >
                 <span>Let&apos;s Launch</span>
                 <ArrowUpRight className="h-4 w-4" />
               </Button>
@@ -116,7 +160,13 @@ export function Navbar() {
 
             {/* Mobile Menu Button */}
             <div className="flex items-center gap-2 md:hidden">
-              <Button href="#contact" variant="default" size="sm" className="px-3 text-xs">
+              <Button
+                href="#contact"
+                onClick={(e) => handleNavClick(e, "#contact")}
+                variant="default"
+                size="sm"
+                className="px-3 text-xs"
+              >
                 <span>Launch</span>
                 <ArrowUpRight className="h-3 w-3" />
               </Button>
@@ -153,7 +203,7 @@ export function Navbar() {
                 <a
                   key={link.name}
                   href={link.href}
-                  onClick={closeMenu}
+                  onClick={(e) => handleNavClick(e, link.href)}
                   className="px-4 py-2.5 text-base font-medium text-[#1E293B] hover:text-[#2C4018] hover:bg-[#F2F7F1] rounded-xl transition-all"
                 >
                   {link.name}
@@ -161,7 +211,12 @@ export function Navbar() {
               ))}
 
               <div className="pt-3 border-t border-[#E2EBE0] mt-1 flex flex-col gap-2">
-                <Button href="#contact" variant="default" className="w-full justify-center">
+                <Button
+                  href="#contact"
+                  onClick={(e) => handleNavClick(e, "#contact")}
+                  variant="default"
+                  className="w-full justify-center"
+                >
                   <span>Start Your 7-Day Free Trial</span>
                   <ArrowUpRight className="h-4 w-4" />
                 </Button>

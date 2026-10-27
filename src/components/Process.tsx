@@ -16,7 +16,7 @@ const STEP_ICONS = [
 
 export function Process() {
   return (
-    <section id="process" className="py-20 md:py-28 bg-[#F2F7F1] relative overflow-hidden">
+    <section id="process" className="scroll-mt-24 py-20 md:py-28 bg-[#F2F7F1] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">

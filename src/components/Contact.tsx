@@ -51,7 +51,7 @@ export function Contact() {
   };
 
   return (
-    <section id="contact" className="py-20 md:py-28 bg-[#F2F7F1] relative overflow-hidden">
+    <section id="contact" className="scroll-mt-24 py-20 md:py-28 bg-[#F2F7F1] relative overflow-hidden">
       {/* Background Banner element using /images/p7.jpg */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
         <div className="relative rounded-3xl overflow-hidden border border-[#E2EBE0] shadow-xl bg-[#2C4018]">
