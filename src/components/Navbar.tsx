@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowUpRight, Sparkles, MessageCircle, Rocket } from "lucide-react";
+import { Menu, X, ArrowUpRight, MessageCircle, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AGENCY_INFO } from "@/data/portfolioData";
 

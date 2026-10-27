@@ -5,12 +5,9 @@ import Link from "next/link";
 import {
   ArrowUp,
   Mail,
-  Heart,
-  Sparkles,
   Rocket,
-  ShieldCheck,
 } from "lucide-react";
-import { Instagram, Linkedin } from "@/components/icons/SocialIcons";
+import { Instagram } from "@/components/icons/SocialIcons";
 import { AGENCY_INFO, SERVICES_9_GRID } from "@/data/portfolioData";
 
 export function Footer() {

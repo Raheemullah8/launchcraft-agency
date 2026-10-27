@@ -7,10 +7,8 @@ import {
   TrendingUp,
   Palette,
   Target,
-  CheckCircle,
   ArrowUpRight,
   Sparkles,
-  Rocket,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

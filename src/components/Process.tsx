@@ -3,7 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight, CheckCircle2, Search, Compass, Rocket, BarChart3 } from "lucide-react";
+import { CheckCircle2, Search, Compass, Rocket, BarChart3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { WORKFLOW_4_STEPS } from "@/data/portfolioData";
 

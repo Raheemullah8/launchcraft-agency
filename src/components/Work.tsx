@@ -3,18 +3,11 @@
 import * as React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import {
-  ExternalLink,
-  ArrowUpRight,
-  Sparkles,
-  CheckCircle2,
-  TrendingUp,
-  BarChart,
-} from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { CASE_STUDIES, CaseStudy } from "@/data/portfolioData";
+import { CASE_STUDIES } from "@/data/portfolioData";
 
 export function Work() {
   return (

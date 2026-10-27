@@ -7,13 +7,10 @@ import {
   ArrowDown,
   ArrowUpRight,
   Sparkles,
-  Target,
   TrendingUp,
-  ShieldCheck,
-  CheckCircle2,
   Rocket,
 } from "lucide-react";
-import { Instagram, Linkedin } from "@/components/icons/SocialIcons";
+import { Instagram } from "@/components/icons/SocialIcons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AGENCY_INFO } from "@/data/portfolioData";

@@ -5,17 +5,15 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   Mail,
-  MapPin,
   Clock,
   Send,
   CheckCircle2,
   Sparkles,
   ArrowUpRight,
   ShieldCheck,
-  MessageCircle,
   Rocket,
 } from "lucide-react";
-import { Instagram, Linkedin } from "@/components/icons/SocialIcons";
+import { Instagram } from "@/components/icons/SocialIcons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";

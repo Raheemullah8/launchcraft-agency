@@ -23,6 +23,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://launchcraft.agency"),
   title: "Launch Craft (launch.craft) — Digital Growth Agency | Branding • Social Media • Marketing",
   description:
     "Helping businesses launch, grow & stand out. Launch Craft is a digital growth agency specializing in Brand Strategy, Social Media Management, Meta & Google Ads, Web Development, SEO, and E-commerce.",
