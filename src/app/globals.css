@@ -1,26 +1,81 @@
 @import "tailwindcss";
 
+@theme {
+  --font-serif: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  --color-olive: #2C4018;
+  --color-olive-dark: #1A270F;
+  --color-olive-light: #3D5922;
+  --color-sage: #7A9A60;
+  --color-sage-light: #95B47C;
+  --color-sage-pale: #E3EDE0;
+  --color-mint: #F2F7F1;
+  --color-mint-card: #F9FBF8;
+  --color-charcoal: #1E293B;
+  --color-charcoal-muted: #526055;
+  --color-border-subtle: #E2EBE0;
+  --color-border-sage: rgba(122, 154, 96, 0.25);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FFFFFF;
+  --foreground: #1E293B;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  selection-background-color: #7A9A60;
+  selection-color: #FFFFFF;
+}
+
+::selection {
+  background-color: #7A9A60;
+  color: #FFFFFF;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F2F7F1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #B6CDA9;
+  border-radius: 9999px;
+  border: 2px solid #F2F7F1;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #7A9A60;
+}
+
+/* Glassmorphism helpers */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 235, 224, 0.8);
+}
+
+.glass-panel-dark {
+  background: rgba(44, 64, 24, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(122, 154, 96, 0.3);
+}
+
+.text-editorial-title {
+  font-family: var(--font-fraunces), Georgia, serif;
+  letter-spacing: -0.02em;
 }
