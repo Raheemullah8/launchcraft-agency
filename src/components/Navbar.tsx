@@ -2,236 +2,169 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowUpRight, MessageCircle, Rocket } from "lucide-react";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { AGENCY_INFO } from "@/data/portfolioData";
 
 const NAV_LINKS = [
-  { name: "Services", href: "#services" },
-  { name: "Process", href: "#process" },
-  { name: "Work", href: "#work" },
-  { name: "About", href: "#about" },
-  { name: "Contact", href: "#contact" },
+  { name: "Services", href: "/services" },
+  { name: "Work", href: "/work" },
+  { name: "About", href: "/about" },
+  { name: "Careers", href: "/careers" },
+  { name: "Contact", href: "/contact" },
 ];
 
 export function Navbar() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
+  const pathname = usePathname();
 
   React.useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 20) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
+      setScrolled(window.scrollY > 20);
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const closeMenu = () => setIsOpen(false);
+  // Close mobile drawer on route change
+  React.useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
-  const handleNavClick = (
-    e: React.MouseEvent<HTMLElement>,
-    href: string
-  ) => {
-    if (href.startsWith("#")) {
-      e.preventDefault();
-      setIsOpen(false);
-
-      const targetId = href.replace("#", "");
-      if (!targetId) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        window.history.pushState(null, "", window.location.pathname);
-        return;
-      }
-
-      // Small delay to allow the drawer to close cleanly before scrolling
-      setTimeout(() => {
-        const targetElement = document.getElementById(targetId);
-        if (targetElement) {
-          const navOffset = 75;
-          const elementPosition = targetElement.getBoundingClientRect().top + window.scrollY;
-          const offsetPosition = Math.max(0, elementPosition - navOffset);
-
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-
-          window.history.pushState(null, "", href);
-        }
-      }, 50);
-    } else {
-      setIsOpen(false);
+  // Handle Escape key to close mobile menu
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+      return () => window.removeEventListener("keydown", handleKeyDown);
     }
-  };
+  }, [isOpen]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 transition-all duration-300">
-      {/* Top Special Offer Announcement Bar */}
-      <div className="bg-[#2C4018] text-[#F2F7F1] py-1.5 px-4 text-center text-xs font-medium border-b border-[#3E5723]/30">
-        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#7A9A60] text-white text-[10px] font-bold uppercase tracking-wider">
-            Limited Offer
-          </span>
-          <span className="truncate">
-            {AGENCY_INFO.specialOffer}
-          </span>
-          <a
-            href="#contact"
-            onClick={(e) => handleNavClick(e, "#contact")}
-            className="hidden sm:inline-flex items-center gap-1 font-semibold text-[#95B47C] hover:text-white underline underline-offset-2 ml-1"
-          >
-            Claim Yours
-            <ArrowUpRight className="w-3 h-3" />
-          </a>
-        </div>
-      </div>
-
-      {/* Main Navbar */}
+    <header className="fixed top-0 left-0 right-0 z-40 transition-all duration-200">
+      {/* Editorial Navigation Bar */}
       <div
-        className={`transition-all duration-300 ${
+        className={`transition-all duration-200 ${
           scrolled
-            ? "bg-white/90 backdrop-blur-md shadow-sm border-b border-[#E2EBE0] py-3"
-            : "bg-white/80 backdrop-blur-xs py-4"
+            ? "bg-[#FAF8F5]/90 backdrop-blur-md border-b border-[#E5E0D8] py-3.5 shadow-xs"
+            : "bg-[#F5F1E9]/80 backdrop-blur-xs border-b border-transparent py-5"
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            {/* Brand Logo */}
+            {/* Brand Logo & Editorial Motto */}
             <Link
-              href="#"
-              onClick={(e) => handleNavClick(e, "#")}
-              className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A9A60] rounded-xl"
+              href="/"
+              className="group flex items-baseline gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#171717] rounded-sm"
+              aria-label="LaunchCraft Home"
             >
-              <div className="h-10 w-10 rounded-xl bg-[#2C4018] flex items-center justify-center text-[#F2F7F1] shadow-xs transition-transform duration-300 group-hover:scale-105 group-hover:bg-[#3D5922]">
-                <Rocket className="w-5 h-5 text-[#95B47C]" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-serif font-bold text-xl text-[#2C4018] tracking-tight leading-none group-hover:text-[#7A9A60] transition-colors">
-                  Launch Craft
-                </span>
-                <span className="text-[11px] font-mono font-medium text-[#7A9A60] tracking-wider mt-0.5">
-                  @{AGENCY_INFO.handle}
-                </span>
-              </div>
+              <span className="font-serif font-black text-2xl tracking-tighter text-[#171717]">
+                LAUNCHCRAFT
+              </span>
+              <span className="hidden sm:inline-block text-[11px] font-mono text-[#777777] uppercase tracking-widest pl-1 border-l border-[#D8D2C6]">
+                From Idea to Impact
+              </span>
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1 lg:gap-2 bg-[#F2F7F1] px-4 py-1.5 rounded-full border border-[#E2EBE0]">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={(e) => handleNavClick(e, link.href)}
-                  className="px-4 py-1.5 text-sm font-medium text-[#1E293B] hover:text-[#2C4018] rounded-full transition-all duration-200 hover:bg-white hover:shadow-xs"
-                >
-                  {link.name}
-                </a>
-              ))}
+            {/* Desktop Navigation Links */}
+            <nav
+              className="hidden md:flex items-center gap-1 lg:gap-2 px-3 py-1.5 rounded-full bg-white/70 border border-[#E5E0D8] backdrop-blur-xs"
+              aria-label="Main Navigation"
+            >
+              {NAV_LINKS.map((link) => {
+                const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
+                return (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    className={`px-4 py-1.5 text-xs font-mono uppercase tracking-wider rounded-full transition-colors ${
+                      isActive
+                        ? "bg-[#171717] text-[#F5F1E9] font-semibold"
+                        : "text-[#171717] hover:text-[#000000] hover:bg-[#F5F1E9]"
+                    }`}
+                  >
+                    {link.name}
+                  </Link>
+                );
+              })}
             </nav>
 
-            {/* Desktop CTA & Instagram Direct Link */}
-            <div className="hidden lg:flex items-center gap-3">
-              <a
-                href={AGENCY_INFO.instagramUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F2F7F1] border border-[#E2EBE0] text-xs font-semibold text-[#2C4018] hover:border-[#7A9A60] transition-colors"
-                title="DM us on Instagram"
-              >
-                <MessageCircle className="w-3.5 h-3.5 text-[#7A9A60]" />
-                <span>DM Us</span>
-              </a>
-
-              <Button
-                href="#contact"
-                onClick={(e) => handleNavClick(e, "#contact")}
-                variant="default"
-                size="default"
-              >
-                <span>Let&apos;s Launch</span>
-                <ArrowUpRight className="h-4 w-4" />
+            {/* Primary Action Button */}
+            <div className="hidden md:flex items-center gap-3">
+              <Button href="/book" variant="default" size="default">
+                <span>Book a Consultation</span>
+                <ArrowUpRight className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile Hamburger Button */}
             <div className="flex items-center gap-2 md:hidden">
-              <Button
-                href="#contact"
-                onClick={(e) => handleNavClick(e, "#contact")}
-                variant="default"
-                size="sm"
-                className="px-3 text-xs"
-              >
-                <span>Launch</span>
-                <ArrowUpRight className="h-3 w-3" />
+              <Button href="/book" variant="default" size="sm" className="px-3.5 text-xs">
+                <span>Book</span>
               </Button>
-
               <button
+                type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="p-2.5 rounded-xl border border-[#E2EBE0] bg-white text-[#2C4018] hover:bg-[#F2F7F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7A9A60]"
-                aria-label="Toggle navigation menu"
+                className="p-2.5 rounded-lg border border-[#E5E0D8] bg-white text-[#171717] hover:bg-[#FAF8F5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#171717] min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+                aria-expanded={isOpen}
+                aria-label={isOpen ? "Close main menu" : "Open main menu"}
               >
-                {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Accessible Mobile Menu Overlay */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="md:hidden border-b border-[#E2EBE0] bg-white/98 backdrop-blur-lg px-6 pt-4 pb-6 shadow-xl"
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="md:hidden border-b border-[#E5E0D8] bg-[#FAF8F5] px-6 pt-4 pb-8 shadow-xl"
           >
-            <div className="flex flex-col gap-2">
-              <div className="p-3 rounded-xl bg-[#F2F7F1] border border-[#E2EBE0] text-xs text-[#2C4018] mb-2">
-                <span className="font-bold block text-[#2C4018] mb-0.5">Special Launch Offer</span>
-                <span className="text-[#526055]">{AGENCY_INFO.specialOffer}</span>
-              </div>
+            <nav className="flex flex-col gap-2" aria-label="Mobile Navigation">
+              {NAV_LINKS.map((link) => {
+                const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
+                return (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`px-4 py-3 text-sm font-mono uppercase tracking-wider rounded-lg transition-colors flex items-center justify-between ${
+                      isActive
+                        ? "bg-[#171717] text-[#F5F1E9] font-bold"
+                        : "text-[#171717] hover:bg-[#ECE7DF]"
+                    }`}
+                  >
+                    <span>{link.name}</span>
+                    <ArrowUpRight className="w-4 h-4 opacity-50" />
+                  </Link>
+                );
+              })}
 
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={(e) => handleNavClick(e, link.href)}
-                  className="px-4 py-2.5 text-base font-medium text-[#1E293B] hover:text-[#2C4018] hover:bg-[#F2F7F1] rounded-xl transition-all"
-                >
-                  {link.name}
-                </a>
-              ))}
-
-              <div className="pt-3 border-t border-[#E2EBE0] mt-1 flex flex-col gap-2">
+              <div className="pt-4 border-t border-[#E5E0D8] mt-2 flex flex-col gap-3">
                 <Button
-                  href="#contact"
-                  onClick={(e) => handleNavClick(e, "#contact")}
+                  href="/book"
                   variant="default"
-                  className="w-full justify-center"
+                  className="w-full justify-center h-12"
+                  onClick={() => setIsOpen(false)}
                 >
-                  <span>Start Your 7-Day Free Trial</span>
-                  <ArrowUpRight className="h-4 w-4" />
+                  <span>Book a Consultation</span>
+                  <ArrowUpRight className="w-4 h-4" />
                 </Button>
-
-                <a
-                  href={AGENCY_INFO.instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2 text-xs font-semibold text-[#7A9A60] hover:text-[#2C4018]"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>DM us on Instagram (@{AGENCY_INFO.handle})</span>
-                </a>
+                <div className="text-center text-xs text-[#777777] font-mono">
+                  From Idea to Impact • London & Global
+                </div>
               </div>
-            </div>
+            </nav>
           </motion.div>
         )}
       </AnimatePresence>
