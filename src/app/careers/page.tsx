@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowUpRight, ArrowRight, MapPin, Briefcase, Clock } from "lucide-react";
 import { getJobs } from "@/lib/cms/store";
+
+export const instant = false;
 
 export const metadata: Metadata = {
   title: "Careers & Open Positions",
@@ -11,6 +14,7 @@ export const metadata: Metadata = {
 
 
 export default async function CareersPage() {
+  await connection();
   const jobs = await getJobs(true);
 
   const perks = [

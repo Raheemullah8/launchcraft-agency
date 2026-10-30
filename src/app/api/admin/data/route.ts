@@ -8,7 +8,14 @@ import {
   saveJob,
   deleteJob,
   updateApplicationStatus,
+  deleteApplication,
   updateLeadStatus,
+  deleteLead,
+  updateBookingStatus,
+  deleteBooking,
+  saveBookingSchedule,
+  updateSubscriberStatus,
+  deleteSubscriber,
   updateSettings,
 } from "@/lib/cms/store";
 
@@ -56,8 +63,32 @@ export async function POST(req: NextRequest) {
       case "update_app_status":
         await updateApplicationStatus(payload.id, payload.status);
         break;
+      case "delete_app":
+        await deleteApplication(payload.id);
+        break;
       case "update_lead_status":
         await updateLeadStatus(payload.id, payload.status);
+        break;
+      case "delete_lead":
+        await deleteLead((payload as { id: string }).id);
+        break;
+      case "update_booking_schedule":
+        await saveBookingSchedule(payload);
+        break;
+      case "update_booking_status":
+        await updateBookingStatus(payload.id, payload.status);
+        break;
+      case "delete_booking":
+        await deleteBooking((payload as { id: string }).id);
+        break;
+      case "update_subscriber_status":
+        await updateSubscriberStatus(
+          (payload as { id: string; active: boolean }).id,
+          (payload as { id: string; active: boolean }).active
+        );
+        break;
+      case "delete_subscriber":
+        await deleteSubscriber((payload as { id: string }).id);
         break;
       case "update_settings":
         await updateSettings(payload);

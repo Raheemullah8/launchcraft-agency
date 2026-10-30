@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSiteSettings } from "@/context/SettingsContext";
 
 const NAV_LINKS = [
   { name: "Services", href: "/services" },
@@ -16,9 +18,14 @@ const NAV_LINKS = [
 ];
 
 export function Navbar() {
+  const { settings } = useSiteSettings();
   const [isOpen, setIsOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const pathname = usePathname();
+
+  const agencyName = settings?.agencyName || "LAUNCHCRAFT";
+  const tagline = settings?.tagline || "From Idea to Impact";
+  const bookingUrl = settings?.bookingUrl || "/book";
 
   React.useEffect(() => {
     const handleScroll = () => {
@@ -60,13 +67,13 @@ export function Navbar() {
             <Link
               href="/"
               className="group flex items-baseline gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#171717] rounded-sm"
-              aria-label="LaunchCraft Home"
+              aria-label={`${agencyName} Home`}
             >
-              <span className="font-serif font-black text-2xl tracking-tighter text-[#171717]">
-                LAUNCHCRAFT
+              <span className="font-serif font-black text-2xl tracking-tighter text-[#171717] uppercase">
+                {agencyName}
               </span>
               <span className="hidden sm:inline-block text-[11px] font-mono text-[#777777] uppercase tracking-widest pl-1 border-l border-[#D8D2C6]">
-                From Idea to Impact
+                {tagline}
               </span>
             </Link>
 

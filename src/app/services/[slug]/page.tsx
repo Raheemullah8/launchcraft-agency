@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowUpRight, ArrowRight, Check, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
-import { getServiceBySlug, getServices, getPortfolioProjects } from "@/lib/cms/store";
+import { getServiceBySlug, getPortfolioProjects } from "@/lib/cms/store";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const services = await getServices(true);
-  return services.map((s) => ({ slug: s.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -41,6 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export const instant = false;
 
 export default async function ServiceDetailPage({ params }: PageProps) {
+  await connection();
   const { slug } = await params;
   const service = await getServiceBySlug(slug);
 

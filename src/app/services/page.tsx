@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { connection } from "next/server";
 import { ArrowUpRight, ArrowRight, Check } from "lucide-react";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
 import { Button } from "@/components/ui/button";
 import { getServices } from "@/lib/cms/store";
+
+export const instant = false;
 
 export const metadata: Metadata = {
   title: "Services & Capabilities",
@@ -11,8 +14,8 @@ export const metadata: Metadata = {
     "Explore LaunchCraft's core service offerings: Business Counseling, Startup Support, Branding Services, Marketing Strategy, Product Launch Consulting, and Website Setup.",
 };
 
-
 export default async function ServicesPage() {
+  await connection();
   const services = await getServices(true);
 
   const specializedCapabilities = [
@@ -52,11 +55,21 @@ export default async function ServicesPage() {
             Core Service Taxonomy
           </h2>
           <span className="text-xs font-mono text-[#777777]">
-            6 Primary Disciplines
+            {services.length} {services.length === 1 ? "Practice Area" : "Practice Areas"}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {services.length === 0 ? (
+          <div className="p-16 text-center rounded-2xl bg-white border border-[#E5E0D8] space-y-3">
+            <h3 className="font-serif text-2xl font-bold text-[#171717]">
+              No services listed at this moment
+            </h3>
+            <p className="text-sm text-[#777777] max-w-md mx-auto">
+              Please check back soon or contact our advisory team directly.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {services.map((service, index) => (
             <div
               key={service.id}
@@ -112,6 +125,7 @@ export default async function ServicesPage() {
             </div>
           ))}
         </div>
+      )}
       </div>
 
       {/* Specialized Cross-Functional Offerings */}

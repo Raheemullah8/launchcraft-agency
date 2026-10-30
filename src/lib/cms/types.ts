@@ -94,28 +94,34 @@ export type LeadStatus = "New" | "Contacted" | "Qualified" | "Closed";
 
 export interface Lead {
   id: string;
-  type: LeadType;
+  type: LeadType | string;
   name: string;
-  businessName?: string;
+  businessName?: string | null;
   email: string;
-  phone?: string;
+  phone?: string | null;
+  service?: string | null;
+  selectedServices?: string[];
+  budget?: string | null;
+  budgetRange?: string | null;
+  timeline?: string | null;
+  message: string;
+  description?: string;
   subject?: string;
-  selectedServices: string[];
-  description: string;
-  timeline?: string;
-  budgetRange?: string;
-  consentAccepted: boolean;
-  consentTimestamp: string;
-  status: LeadStatus;
+  status: LeadStatus | string;
+  source?: string | null;
+  consentAccepted?: boolean;
+  consentTimestamp?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Subscriber {
   id: string;
   email: string;
-  source: string;
-  consentTimestamp: string;
-  status: "Active" | "Unsubscribed";
+  source?: string | null;
+  active: boolean;
+  status?: "Active" | "Unsubscribed" | string;
+  consentTimestamp?: string;
   createdAt: string;
 }
 
@@ -135,6 +141,32 @@ export interface SiteSettings {
   bookingNotice: string;
 }
 
+export interface Booking {
+  id: string;
+  name: string;
+  email: string;
+  businessName?: string | null;
+  serviceInterest?: string | null;
+  date: string; // YYYY-MM-DD
+  timeSlot: string; // e.g. "09:30 AM"
+  timezone: string;
+  notes?: string | null;
+  status: "Confirmed" | "Completed" | "Cancelled" | string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface BookingSchedule {
+  id: string;
+  workingDays: number[]; // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun
+  timeSlots: string[]; // e.g. ["09:30 AM", "11:00 AM", ...]
+  blockedDates: string[]; // Array of "YYYY-MM-DD"
+  durationMinutes: number;
+  maxAdvanceDays: number;
+  notice?: string | null;
+  updatedAt?: string;
+}
+
 export interface CMSData {
   services: Service[];
   portfolio: PortfolioProject[];
@@ -142,6 +174,8 @@ export interface CMSData {
   applications: Application[];
   leads: Lead[];
   subscribers: Subscriber[];
+  bookings: Booking[];
+  bookingSchedule: BookingSchedule;
   settings: SiteSettings;
 }
 

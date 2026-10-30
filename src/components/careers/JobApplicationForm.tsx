@@ -2,36 +2,50 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { UploadCloud, CheckCircle2, AlertCircle, FileText, ArrowRight } from "lucide-react";
 import { Job } from "@/lib/cms/types";
 import { trackEvent } from "@/lib/analytics";
+import { jobApplicationSchema, type JobApplicationFormData } from "@/lib/validations/careers";
+import { api, getApiErrorMessage } from "@/lib/api";
 
 interface JobApplicationFormProps {
   job: Job;
 }
 
 export function JobApplicationForm({ job }: JobApplicationFormProps) {
-  const [candidateName, setCandidateName] = React.useState("");
-  const [candidateEmail, setCandidateEmail] = React.useState("");
-  const [candidatePhone, setCandidatePhone] = React.useState("");
-  const [portfolioUrl, setPortfolioUrl] = React.useState("");
-  const [coverNote, setCoverNote] = React.useState("");
-  const [consentAccepted, setConsentAccepted] = React.useState(false);
   const [cvFile, setCvFile] = React.useState<File | null>(null);
-
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
-  const [successData, setSuccessData] = React.useState<{ applicationId: string } | null>(null);
+  const [fileError, setFileError] = React.useState<string | null>(null);
+  const [serverError, setServerError] = React.useState<string | null>(null);
+  const [successData, setSuccessData] = React.useState<{ applicationId: string; candidateName: string } | null>(null);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<JobApplicationFormData>({
+    resolver: zodResolver(jobApplicationSchema),
+    defaultValues: {
+      candidateName: "",
+      candidateEmail: "",
+      candidatePhone: "",
+      portfolioUrl: "",
+      coverNote: "",
+      consentAccepted: false as unknown as true,
+    },
+    mode: "onBlur",
+  });
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setErrorMsg(null);
+    setFileError(null);
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg("CV file size exceeds the 5 MB limit.");
+      setFileError("CV file size exceeds the 5 MB limit.");
       setCvFile(null);
       return;
     }
@@ -39,7 +53,7 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
     const lowerName = file.name.toLowerCase();
     const isValidFormat = lowerName.endsWith(".pdf") || lowerName.endsWith(".docx");
     if (!isValidFormat) {
-      setErrorMsg("Please upload a PDF or DOCX file.");
+      setFileError("Please upload a PDF or DOCX file.");
       setCvFile(null);
       return;
     }
@@ -47,52 +61,39 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
     setCvFile(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
+  const onSubmit = async (data: JobApplicationFormData) => {
+    setServerError(null);
 
     if (!cvFile) {
-      setErrorMsg("Please attach your CV in PDF or DOCX format.");
+      setFileError("Please attach your CV in PDF or DOCX format.");
       return;
     }
-
-    if (!consentAccepted) {
-      setErrorMsg("You must accept the privacy policy to submit your application.");
-      return;
-    }
-
-    setIsSubmitting(true);
 
     try {
       const formData = new FormData();
       formData.append("jobSlug", job.slug);
-      formData.append("candidateName", candidateName);
-      formData.append("candidateEmail", candidateEmail);
-      if (candidatePhone) formData.append("candidatePhone", candidatePhone);
-      if (portfolioUrl) formData.append("portfolioUrl", portfolioUrl);
-      if (coverNote) formData.append("coverNote", coverNote);
+      formData.append("candidateName", data.candidateName);
+      formData.append("candidateEmail", data.candidateEmail);
+      if (data.candidatePhone) formData.append("candidatePhone", data.candidatePhone);
+      if (data.portfolioUrl) formData.append("portfolioUrl", data.portfolioUrl);
+      if (data.coverNote) formData.append("coverNote", data.coverNote);
       formData.append("consentAccepted", "true");
       formData.append("cvFile", cvFile);
 
-      const res = await fetch("/api/careers/apply", {
-        method: "POST",
-        body: formData,
+      const res = await api.post<{ applicationId: string }>("/careers/apply", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Submission failed.");
-      }
-
-      setSuccessData({ applicationId: data.applicationId });
+      setSuccessData({
+        applicationId: res.data.applicationId,
+        candidateName: data.candidateName,
+      });
       trackEvent("job_apply_success", {
         jobSlug: job.slug,
         pagePath: `/careers/${job.slug}`,
       });
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to submit application.");
-    } finally {
-      setIsSubmitting(false);
+      setServerError(getApiErrorMessage(err, "Failed to submit application."));
     }
   };
 
@@ -107,7 +108,7 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
             Application Acknowledged
           </span>
           <h3 className="font-serif text-3xl font-bold text-[#171717]">
-            Thank you, {candidateName.split(" ")[0]}.
+            Thank you, {successData.candidateName.split(" ")[0]}.
           </h3>
           <p className="text-sm text-[#555555] max-w-lg mx-auto leading-relaxed">
             Your application for <span className="font-semibold text-[#171717]">{job.title}</span> has been securely logged. Our recruitment lead reviews every CV and will reach out if there is a mutual fit.
@@ -137,7 +138,11 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="p-8 sm:p-10 rounded-2xl bg-white border border-[#E5E0D8] space-y-6">
+    <form
+      onSubmit={handleSubmit(onSubmit)}
+      className="p-8 sm:p-10 rounded-2xl bg-white border border-[#E5E0D8] space-y-6"
+      noValidate
+    >
       <div className="border-b border-[#E5E0D8] pb-4">
         <h3 className="font-serif text-2xl font-bold text-[#171717]">
           Direct Application
@@ -147,21 +152,12 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
         </p>
       </div>
 
-      {errorMsg && (
+      {(serverError || fileError) && (
         <div className="p-4 rounded-xl bg-[#FFF5F5] border border-[#FED7D7] flex items-center gap-3 text-xs text-[#C53030]">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMsg}</span>
+          <span>{serverError || fileError}</span>
         </div>
       )}
-
-      {/* Honeypot field */}
-      <input
-        type="text"
-        name="portfolio_company_trap"
-        style={{ display: "none" }}
-        tabIndex={-1}
-        autoComplete="off"
-      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="space-y-1.5">
@@ -171,12 +167,19 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
           <input
             id="app-name"
             type="text"
-            required
-            value={candidateName}
-            onChange={(e) => setCandidateName(e.target.value)}
+            {...register("candidateName")}
             placeholder="Jane Doe"
-            className="w-full h-11 px-3.5 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none focus-visible:border-[#171717]"
+            className={`w-full h-11 px-3.5 rounded-lg border bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none transition-colors ${
+              errors.candidateName
+                ? "border-red-400 focus-visible:border-red-500"
+                : "border-[#E5E0D8] focus-visible:border-[#171717]"
+            }`}
           />
+          {errors.candidateName && (
+            <p className="text-[11px] text-red-500 font-mono mt-1">
+              {errors.candidateName.message}
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">
@@ -186,12 +189,19 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
           <input
             id="app-email"
             type="email"
-            required
-            value={candidateEmail}
-            onChange={(e) => setCandidateEmail(e.target.value)}
+            {...register("candidateEmail")}
             placeholder="jane@example.com"
-            className="w-full h-11 px-3.5 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none focus-visible:border-[#171717]"
+            className={`w-full h-11 px-3.5 rounded-lg border bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none transition-colors ${
+              errors.candidateEmail
+                ? "border-red-400 focus-visible:border-red-500"
+                : "border-[#E5E0D8] focus-visible:border-[#171717]"
+            }`}
           />
+          {errors.candidateEmail && (
+            <p className="text-[11px] text-red-500 font-mono mt-1">
+              {errors.candidateEmail.message}
+            </p>
+          )}
         </div>
       </div>
 
@@ -203,8 +213,7 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
           <input
             id="app-phone"
             type="tel"
-            value={candidatePhone}
-            onChange={(e) => setCandidatePhone(e.target.value)}
+            {...register("candidatePhone")}
             placeholder="+44 7700 900077"
             className="w-full h-11 px-3.5 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none focus-visible:border-[#171717]"
           />
@@ -217,11 +226,19 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
           <input
             id="app-portfolio"
             type="url"
-            value={portfolioUrl}
-            onChange={(e) => setPortfolioUrl(e.target.value)}
+            {...register("portfolioUrl")}
             placeholder="https://linkedin.com/in/username"
-            className="w-full h-11 px-3.5 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none focus-visible:border-[#171717]"
+            className={`w-full h-11 px-3.5 rounded-lg border bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none transition-colors ${
+              errors.portfolioUrl
+                ? "border-red-400 focus-visible:border-red-500"
+                : "border-[#E5E0D8] focus-visible:border-[#171717]"
+            }`}
           />
+          {errors.portfolioUrl && (
+            <p className="text-[11px] text-red-500 font-mono mt-1">
+              {errors.portfolioUrl.message}
+            </p>
+          )}
         </div>
       </div>
 
@@ -259,40 +276,56 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
             </div>
           )}
         </div>
+        {fileError && (
+          <p className="text-[11px] text-red-500 font-mono mt-1">{fileError}</p>
+        )}
       </div>
 
       {/* Cover Note */}
       <div className="space-y-1.5">
         <label htmlFor="app-note" className="block text-xs font-mono text-[#171717]">
-          Brief Cover Note (Optional)
+          Brief Cover Note <span className="text-red-500">*</span>
         </label>
         <textarea
           id="app-note"
           rows={3}
-          value={coverNote}
-          onChange={(e) => setCoverNote(e.target.value)}
+          {...register("coverNote")}
           placeholder="Tell us what draws you to LaunchCraft and highlight your most relevant project experience..."
-          className="w-full p-3.5 rounded-lg border border-[#E5E0D8] bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none focus-visible:border-[#171717]"
+          className={`w-full p-3.5 rounded-lg border bg-[#FAF8F5] text-sm text-[#171717] focus-visible:outline-none transition-colors ${
+            errors.coverNote
+              ? "border-red-400 focus-visible:border-red-500"
+              : "border-[#E5E0D8] focus-visible:border-[#171717]"
+          }`}
         />
+        {errors.coverNote && (
+          <p className="text-[11px] text-red-500 font-mono mt-1">
+            {errors.coverNote.message}
+          </p>
+        )}
       </div>
 
       {/* Consent Checkbox */}
-      <div className="flex items-start gap-3 pt-2">
-        <input
-          id="app-consent"
-          type="checkbox"
-          required
-          checked={consentAccepted}
-          onChange={(e) => setConsentAccepted(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-[#D8D2C6] text-[#171717] focus:ring-[#171717] cursor-pointer"
-        />
-        <label htmlFor="app-consent" className="text-xs text-[#555555] leading-relaxed cursor-pointer">
-          I consent to LaunchCraft processing my personal data and CV strictly for recruitment evaluation in accordance with the{" "}
-          <Link href="/privacy" className="text-[#171717] underline" target="_blank">
-            Privacy Policy
-          </Link>
-          . I understand my data is stored securely in private storage and not shared with third parties.
-        </label>
+      <div className="space-y-1 pt-2">
+        <div className="flex items-start gap-3">
+          <input
+            id="app-consent"
+            type="checkbox"
+            {...register("consentAccepted")}
+            className="mt-1 h-4 w-4 rounded border-[#D8D2C6] text-[#171717] focus:ring-[#171717] cursor-pointer"
+          />
+          <label htmlFor="app-consent" className="text-xs text-[#555555] leading-relaxed cursor-pointer">
+            I consent to LaunchCraft processing my personal data and CV strictly for recruitment evaluation in accordance with the{" "}
+            <Link href="/privacy" className="text-[#171717] underline" target="_blank">
+              Privacy Policy
+            </Link>
+            . I understand my data is stored securely in private storage and not shared with third parties.
+          </label>
+        </div>
+        {errors.consentAccepted && (
+          <p className="text-[11px] text-red-500 font-mono">
+            {errors.consentAccepted.message}
+          </p>
+        )}
       </div>
 
       <button
@@ -306,4 +339,3 @@ export function JobApplicationForm({ job }: JobApplicationFormProps) {
     </form>
   );
 }
-

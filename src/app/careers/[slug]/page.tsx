@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import Link from "next/link";
 import { MapPin, Briefcase, Calendar, Clock, ArrowLeft, Check } from "lucide-react";
 import { JobApplicationForm } from "@/components/careers/JobApplicationForm";
-import { getJobBySlug, getJobs } from "@/lib/cms/store";
+import { getJobBySlug } from "@/lib/cms/store";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const jobs = await getJobs(true);
-  return jobs.map((j) => ({ slug: j.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -39,6 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export const instant = false;
 
 export default async function JobDetailPage({ params }: PageProps) {
+  await connection();
   const { slug } = await params;
   const job = await getJobBySlug(slug);
 

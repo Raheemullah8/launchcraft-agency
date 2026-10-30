@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { Calendar as CalendarIcon, Clock, Globe, CheckCircle2, ArrowRight, ShieldCheck, Download } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { api, getApiErrorMessage } from "@/lib/api";
+import { BookingSchedule } from "@/lib/cms/types";
 
 const COMMON_TIMEZONES = [
   "Europe/London (GMT/BST)",
@@ -43,31 +45,81 @@ export function ConsultationScheduler() {
 
   // Available dates calculated on client mount to avoid prerender clock skew
   const [availableDates, setAvailableDates] = React.useState<{ dateStr: string; label: string; dayName: string }[]>([]);
+  const [schedule, setSchedule] = React.useState<BookingSchedule | null>(null);
+  const [bookedSlots, setBookedSlots] = React.useState<string[]>([]);
+  const [loadingSchedule, setLoadingSchedule] = React.useState(true);
 
+  // 1. Load active booking schedule & working days
   React.useEffect(() => {
-    const dates: { dateStr: string; label: string; dayName: string }[] = [];
-    const current = new Date();
-    current.setDate(current.getDate() + 1); // Start tomorrow
+    async function loadSchedule() {
+      try {
+        setLoadingSchedule(true);
+        const res = await fetch("/api/book/schedule", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.schedule) {
+            setSchedule(data.schedule);
+            
+            // Generate available dates from workingDays & blockedDates
+            const workingDays = Array.isArray(data.schedule.workingDays) && data.schedule.workingDays.length > 0
+              ? data.schedule.workingDays
+              : [1, 2, 3, 4, 5];
+            const blocked = Array.isArray(data.schedule.blockedDates) ? data.schedule.blockedDates : [];
+            const maxDays = data.schedule.maxAdvanceDays || 14;
 
-    while (dates.length < 5) {
-      const dayOfWeek = current.getDay();
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        // Exclude weekends
-        const yyyy = current.getFullYear();
-        const mm = String(current.getMonth() + 1).padStart(2, "0");
-        const dd = String(current.getDate()).padStart(2, "0");
-        const dateStr = `${yyyy}-${mm}-${dd}`;
-        const dayName = current.toLocaleDateString("en-US", { weekday: "short" });
-        const label = current.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        dates.push({ dateStr, label, dayName });
+            const dates: { dateStr: string; label: string; dayName: string }[] = [];
+            const current = new Date();
+            current.setDate(current.getDate() + 1); // Start from tomorrow
+
+            const limit = Math.min(Math.max(maxDays, 5), 14);
+            let attempts = 0;
+            while (dates.length < limit && attempts < maxDays + 30) {
+              attempts++;
+              const dayOfWeek = current.getDay();
+              const yyyy = current.getFullYear();
+              const mm = String(current.getMonth() + 1).padStart(2, "0");
+              const dd = String(current.getDate()).padStart(2, "0");
+              const dateStr = `${yyyy}-${mm}-${dd}`;
+
+              if (workingDays.includes(dayOfWeek) && !blocked.includes(dateStr)) {
+                const dayName = current.toLocaleDateString("en-US", { weekday: "short" });
+                const label = current.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                dates.push({ dateStr, label, dayName });
+              }
+              current.setDate(current.getDate() + 1);
+            }
+
+            setAvailableDates(dates);
+            if (dates.length > 0) {
+              setSelectedDate(dates[0].dateStr);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load booking schedule:", err);
+      } finally {
+        setLoadingSchedule(false);
       }
-      current.setDate(current.getDate() + 1);
     }
-    setAvailableDates(dates);
-    if (dates.length > 0) {
-      setSelectedDate(dates[0].dateStr);
-    }
+    loadSchedule();
   }, []);
+
+  // 2. Fetch booked slots when selectedDate changes
+  React.useEffect(() => {
+    if (!selectedDate) return;
+    async function fetchBookedSlots() {
+      try {
+        const res = await fetch(`/api/book/schedule?date=${selectedDate}`, { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          setBookedSlots(Array.isArray(data.bookedSlots) ? data.bookedSlots : []);
+        }
+      } catch (err) {
+        console.warn("Failed to check booked slots for date:", err);
+      }
+    }
+    fetchBookedSlots();
+  }, [selectedDate]);
 
   // Attempt to detect visitor timezone
   React.useEffect(() => {
@@ -99,30 +151,24 @@ export function ConsultationScheduler() {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch("/api/book", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          email,
-          businessName: company,
-          serviceInterest: focusArea,
-          date: selectedDate,
-          timeSlot: selectedSlot,
-          timezone,
-          notes,
-          consentAccepted: true,
-        }),
+      const res = await api.post<{
+        bookingId: string;
+        appointment: { date: string; timeSlot: string; timezone: string };
+      }>("/book", {
+        name,
+        email,
+        businessName: company,
+        serviceInterest: focusArea,
+        date: selectedDate,
+        timeSlot: selectedSlot,
+        timezone,
+        notes,
+        consentAccepted: true,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Booking failed.");
-      }
-
       setBookingConfirmed({
-        bookingId: data.bookingId,
-        appointment: data.appointment,
+        bookingId: res.data.bookingId,
+        appointment: res.data.appointment,
       });
 
       trackEvent("booking_complete", {
@@ -130,7 +176,7 @@ export function ConsultationScheduler() {
         bookingType: "private_consultation_30min",
       });
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to confirm booking.");
+      setErrorMsg(getApiErrorMessage(err, "Failed to confirm booking."));
     } finally {
       setIsSubmitting(false);
     }
@@ -175,7 +221,7 @@ END:VCALENDAR`;
             Session Confirmed
           </h2>
           <p className="text-sm text-[#555555] max-w-lg mx-auto leading-relaxed">
-            A 30-minute private consultation with a senior LaunchCraft partner has been registered for <span className="font-semibold text-[#171717]">{name}</span>.
+            A {schedule?.durationMinutes || 30}-minute private consultation with a senior LaunchCraft partner has been registered for <span className="font-semibold text-[#171717]">{name}</span>.
           </p>
         </div>
 
@@ -183,7 +229,7 @@ END:VCALENDAR`;
         <div className="p-6 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] text-left space-y-3 max-w-md mx-auto">
           <div className="flex items-center justify-between text-xs font-mono text-[#777777] border-b border-[#E5E0D8] pb-2">
             <span>REFERENCE: {bookingConfirmed.bookingId}</span>
-            <span>30 MIN CALL</span>
+            <span>{schedule?.durationMinutes || 30} MIN CALL</span>
           </div>
           <div className="space-y-1 text-sm text-[#171717]">
             <div className="font-bold flex items-center gap-2">
@@ -228,7 +274,7 @@ END:VCALENDAR`;
             Senior partner briefing on your milestone objectives.
           </h2>
           <p className="text-sm text-[#555555] mt-3 leading-relaxed">
-            During this 30-minute private session, we review your current positioning, digital platform bottlenecks, and growth opportunities. No pitch decks, just honest commercial counsel.
+            During this {schedule?.durationMinutes || 30}-minute private session, we review your current positioning, digital platform bottlenecks, and growth opportunities. No pitch decks, just honest commercial counsel.
           </p>
         </div>
 
@@ -238,7 +284,7 @@ END:VCALENDAR`;
               Format &amp; Venue
             </div>
             <p className="text-sm font-semibold text-[#171717]">
-              1-on-1 Video Conference (Google Meet / Zoom)
+              1-on-1 Video Conference ({schedule?.durationMinutes || 30} Min)
             </p>
           </div>
 
@@ -272,7 +318,7 @@ END:VCALENDAR`;
                 Select Appointment Slot
               </h3>
               <p className="text-xs text-[#777777] font-mono mt-0.5">
-                30-Minute Video Consultation
+                {schedule?.notice || `${schedule?.durationMinutes || 30}-Minute Video Consultation`}
               </p>
             </div>
 
@@ -301,10 +347,15 @@ END:VCALENDAR`;
 
           {/* Date Selector Chips */}
           <div className="space-y-2">
-            <label className="block text-xs font-mono text-[#171717]">
-              1. Choose Available Date
-            </label>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-mono text-[#171717]">
+                1. Choose Available Date
+              </label>
+              <span className="text-[11px] font-mono text-[#777777]">
+                {availableDates.length} days open
+              </span>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-0.5 scrollbar-thin">
               {availableDates.map((d) => {
                 const isSelected = selectedDate === d.dateStr;
                 return (
@@ -315,14 +366,14 @@ END:VCALENDAR`;
                       setSelectedDate(d.dateStr);
                       setSelectedSlot("");
                     }}
-                    className={`p-2.5 rounded-xl text-center transition-colors border cursor-pointer ${
+                    className={`min-w-[74px] p-2.5 rounded-xl text-center transition-all border cursor-pointer shrink-0 ${
                       isSelected
-                        ? "bg-[#171717] text-[#F5F1E9] border-[#171717] font-bold"
+                        ? "bg-[#171717] text-[#F5F1E9] border-[#171717] font-bold shadow-xs scale-102"
                         : "bg-[#FAF8F5] text-[#555555] border-[#E5E0D8] hover:border-[#171717]"
                     }`}
                   >
-                    <div className="text-[10px] font-mono uppercase">{d.dayName}</div>
-                    <div className="text-xs font-serif font-bold mt-0.5">{d.label}</div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider">{d.dayName}</div>
+                    <div className="text-xs font-serif font-bold mt-0.5 whitespace-nowrap">{d.label}</div>
                   </button>
                 );
               })}
@@ -335,20 +386,32 @@ END:VCALENDAR`;
               2. Select Slot ({timezone.split(" ")[0]})
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {TIME_SLOTS.map((slot) => {
+              {(schedule?.timeSlots || TIME_SLOTS).map((slot) => {
                 const isSelected = selectedSlot === slot;
+                const isBooked = bookedSlots.includes(slot);
+
                 return (
                   <button
                     key={slot}
                     type="button"
-                    onClick={() => setSelectedSlot(slot)}
-                    className={`py-2 px-3 rounded-lg text-xs font-mono transition-colors border text-center cursor-pointer ${
-                      isSelected
-                        ? "bg-[#171717] text-[#F5F1E9] border-[#171717] font-bold"
-                        : "bg-[#FAF8F5] text-[#555555] border-[#E5E0D8] hover:border-[#171717]"
+                    disabled={isBooked}
+                    onClick={() => {
+                      if (!isBooked) setSelectedSlot(slot);
+                    }}
+                    className={`py-2 px-3 rounded-lg text-xs font-mono transition-colors border text-center flex items-center justify-center gap-1.5 ${
+                      isBooked
+                        ? "bg-[#EFEAE1] text-[#999999] border-[#DDD8CE] cursor-not-allowed opacity-60"
+                        : isSelected
+                        ? "bg-[#171717] text-[#F5F1E9] border-[#171717] font-bold cursor-pointer"
+                        : "bg-[#FAF8F5] text-[#555555] border-[#E5E0D8] hover:border-[#171717] cursor-pointer"
                     }`}
                   >
-                    {slot}
+                    <span className={isBooked ? "line-through" : ""}>{slot}</span>
+                    {isBooked && (
+                      <span className="text-[9px] uppercase px-1 rounded bg-[#E5E0D8] text-[#777777]">
+                        Booked
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -462,7 +525,11 @@ END:VCALENDAR`;
             disabled={isSubmitting}
             className="w-full h-12 rounded-full bg-[#171717] text-white font-mono uppercase text-xs tracking-wider font-bold hover:bg-black transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
-            <span>{isSubmitting ? "Confirming Reservation..." : "Confirm 30-Minute Consultation"}</span>
+            <span>
+              {isSubmitting
+                ? "Confirming Reservation..."
+                : `Confirm ${schedule?.durationMinutes || 30}-Minute Consultation`}
+            </span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

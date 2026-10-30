@@ -4,6 +4,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle2, ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { api, getApiErrorMessage } from "@/lib/api";
 
 const POPUP_DISMISS_KEY = "launchcraft_email_popup_dismissed";
 const POPUP_SUBSCRIBED_KEY = "launchcraft_email_subscribed";
@@ -100,20 +101,11 @@ export function EmailPopup() {
     setErrorMessage("");
 
     try {
-      const res = await fetch("/api/newsletter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          consentAccepted: true,
-          source: "timed_editorial_popup",
-        }),
+      await api.post("/newsletter", {
+        email,
+        consentAccepted: true,
+        source: "timed_editorial_popup",
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Subscription failed.");
-      }
 
       setStatus("success");
       trackEvent("email_subscribe_success", { pagePath: window.location.pathname });
@@ -128,7 +120,7 @@ export function EmailPopup() {
       }, 2500);
     } catch (err: unknown) {
       setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : "Subscription error.");
+      setErrorMessage(getApiErrorMessage(err, "Subscription error."));
     } finally {
       setLoading(false);
     }

@@ -1,0 +1,225 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -------------------------------------------------------------
+// Admin / User Authentication
+// -------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("ADMIN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// -------------------------------------------------------------
+// Agency Services
+// -------------------------------------------------------------
+model Service {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  icon          String   @default("Briefcase")
+  shortBenefit  String
+  heroHeadline  String
+  valueProp     String
+  whoItHelps    String[]
+  deliverables  String[]
+  workflowSteps Json     @default("[]")
+  faqs          Json     @default("[]")
+  order         Int      @default(0)
+  status        String   @default("published") // "published" | "draft"
+  metaTitle     String?
+  metaDescription String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("services")
+}
+
+// -------------------------------------------------------------
+// Portfolio Projects
+// -------------------------------------------------------------
+model Project {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  client          String
+  industry        String
+  categories      String[]
+  heroImage       String
+  gallery         String[]
+  challenge       String
+  scope           String[]
+  approach        String
+  outcome         String
+  metrics         Json     @default("[]")
+  featured        Boolean  @default(false)
+  order           Int      @default(0)
+  status          String   @default("published") // "published" | "draft"
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("projects")
+}
+
+// -------------------------------------------------------------
+// Careers & Job Openings
+// -------------------------------------------------------------
+model Job {
+  id               String        @id @default(cuid())
+  slug             String        @unique
+  title            String
+  department       String
+  location         String
+  workArrangement  String        @default("Remote") // "Remote" | "Hybrid" | "On-site"
+  type             String        @default("Full-time") // "Full-time" | "Contract" | "Part-time"
+  postedDate       DateTime      @default(now())
+  summary          String
+  responsibilities String[]
+  qualifications   String[]
+  deadline         DateTime?
+  status           String        @default("published") // "published" | "draft" | "closed"
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  applications     Application[]
+
+  @@map("jobs")
+}
+
+// -------------------------------------------------------------
+// Job Applications (CV submissions)
+// -------------------------------------------------------------
+model Application {
+  id               String   @id @default(cuid())
+  jobId            String
+  job              Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateName    String
+  candidateEmail   String
+  candidatePhone   String?
+  portfolioUrl     String?
+  coverNote        String?
+  cvFileName       String
+  cvStorageKey     String
+  consentAccepted  Boolean  @default(true)
+  consentTimestamp DateTime @default(now())
+  status           String   @default("New") // "New" | "Reviewing" | "Shortlisted" | "Rejected" | "Hired"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("applications")
+}
+
+// -------------------------------------------------------------
+// Leads & Project Inquiries
+// -------------------------------------------------------------
+model Lead {
+  id           String   @id @default(cuid())
+  type         String   @default("project_inquiry") // "general_contact" | "project_inquiry"
+  name         String
+  businessName String?
+  email        String
+  phone        String?
+  service      String?
+  budget       String?
+  timeline     String?
+  message      String
+  status       String   @default("New") // "New" | "Contacted" | "Qualified" | "Closed"
+  source       String?  @default("website")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("leads")
+}
+
+// -------------------------------------------------------------
+// Newsletter Subscribers
+// -------------------------------------------------------------
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?  @default("footer")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("subscribers")
+}
+
+// -------------------------------------------------------------
+// Site Settings (Key-Value CMS Store)
+// -------------------------------------------------------------
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+// -------------------------------------------------------------
+// Media & Asset Storage (Binary Buffer / BYTEA)
+// -------------------------------------------------------------
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  mimeType  String   // e.g. "image/jpeg", "image/png", "image/webp"
+  data      Bytes    // Raw image binary buffer
+  size      Int      // File size in bytes
+  altText   String?  // Optional SEO / accessibility alt text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("media")
+}
+
+// -------------------------------------------------------------
+// Consultation Bookings & Calendar
+// -------------------------------------------------------------
+model Booking {
+  id              String   @id @default(cuid())
+  name            String
+  email           String
+  businessName    String?
+  serviceInterest String?  @default("Branding & Positioning")
+  date            String   // YYYY-MM-DD
+  timeSlot        String   // e.g. "09:30 AM"
+  timezone        String   @default("Europe/London (GMT/BST)")
+  notes           String?
+  status          String   @default("Confirmed") // "Confirmed" | "Completed" | "Cancelled"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("bookings")
+}
+
+// -------------------------------------------------------------
+// Booking Schedule & Slots Configuration
+// -------------------------------------------------------------
+model BookingSchedule {
+  id              String   @id @default("default-schedule")
+  workingDays     Int[]    @default([1, 2, 3, 4, 5]) // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri
+  timeSlots       String[] @default(["09:30 AM", "11:00 AM", "01:30 PM", "03:00 PM", "04:30 PM"])
+  blockedDates    String[] @default([]) // Array of "YYYY-MM-DD"
+  durationMinutes Int      @default(30)
+  maxAdvanceDays  Int      @default(14)
+  notice          String?  @default("Senior partner briefing on your milestone objectives.")
+  updatedAt       DateTime @updatedAt
+
+  @@map("booking_schedules")
+}
+

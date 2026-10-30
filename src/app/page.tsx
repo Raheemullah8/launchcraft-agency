@@ -1,12 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
+import { connection } from "next/server";
 import { ArrowUpRight, ArrowRight, Star, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ServiceIcon } from "@/components/icons/ServiceIcon";
 import { getServices, getPortfolioProjects, getSettings } from "@/lib/cms/store";
 
+export const instant = false;
 
 export default async function HomePage() {
+  await connection();
   const [services, allProjects, settings] = await Promise.all([
     getServices(true),
     getPortfolioProjects({ onlyPublished: true }),
@@ -47,16 +50,23 @@ export default async function HomePage() {
           <div className="lg:col-span-8 space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[#D8D2C6] bg-white/70 text-xs font-mono tracking-widest uppercase text-[#555555]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#171717]" />
-              Creative &amp; Growth Partner
+              {settings?.tagline || "Creative & Growth Partner"}
             </div>
 
             <h1 className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-[#171717] tracking-tight leading-[0.98]">
-              From Idea <br />
-              <span className="italic font-normal">to Impact.</span>
+              {settings?.heroHeadline ? (
+                <span>{settings.heroHeadline}</span>
+              ) : (
+                <>
+                  From Idea <br />
+                  <span className="italic font-normal">to Impact.</span>
+                </>
+              )}
             </h1>
 
             <p className="text-lg sm:text-xl text-[#555555] max-w-2xl leading-relaxed">
-              We partner with visionary founders and leadership teams to build enduring brand identities, high-converting digital flagships, and disciplined customer acquisition engines.
+              {settings?.heroSubheadline ||
+                "We partner with visionary founders and leadership teams to build enduring brand identities, high-converting digital flagships, and disciplined customer acquisition engines."}
             </p>
 
             <div className="pt-4 flex flex-wrap items-center gap-4">
@@ -119,63 +129,69 @@ export default async function HomePage() {
         </div>
 
         {/* Premium Editorial Cards with Generous Whitespace */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {services.slice(0, 6).map((service, index) => (
-            <Link
-              key={service.id}
-              href={`/services/${service.slug}`}
-              className="group rounded-2xl bg-white border border-[#E5E0D8] p-8 sm:p-9 flex flex-col justify-between hover:border-[#171717] hover:shadow-xl hover:shadow-black/5 hover:-translate-y-1 transition-all duration-300 shadow-xs"
-            >
-              <div className="space-y-6">
-                {/* Card Header: Icon container & Number index */}
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center text-[#171717] group-hover:bg-[#171717] group-hover:text-white group-hover:border-[#171717] transition-all duration-300">
-                    <ServiceIcon name={service.icon} className="w-5 h-5" />
+        {services.length === 0 ? (
+          <div className="p-12 text-center rounded-2xl bg-white border border-[#E5E0D8]">
+            <p className="text-sm font-mono text-[#777777]">No services published yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            {services.slice(0, 6).map((service, index) => (
+              <Link
+                key={service.id}
+                href={`/services/${service.slug}`}
+                className="group rounded-2xl bg-white border border-[#E5E0D8] p-8 sm:p-9 flex flex-col justify-between hover:border-[#171717] hover:shadow-xl hover:shadow-black/5 hover:-translate-y-1 transition-all duration-300 shadow-xs"
+              >
+                <div className="space-y-6">
+                  {/* Card Header: Icon container & Number index */}
+                  <div className="flex items-center justify-between">
+                    <div className="w-12 h-12 rounded-xl bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center text-[#171717] group-hover:bg-[#171717] group-hover:text-white group-hover:border-[#171717] transition-all duration-300">
+                      <ServiceIcon name={service.icon} className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-mono text-[#888888] font-bold tracking-wider">
+                      0{index + 1}
+                    </span>
                   </div>
-                  <span className="text-xs font-mono text-[#888888] font-bold tracking-wider">
-                    0{index + 1}
+
+                  {/* Title & Benefit */}
+                  <div className="space-y-2.5">
+                    <h3 className="font-serif text-2xl font-bold text-[#171717] tracking-tight leading-snug group-hover:text-black transition-colors">
+                      {service.title}
+                    </h3>
+
+                    <p className="text-sm text-[#555555] leading-relaxed line-clamp-3">
+                      {service.shortBenefit}
+                    </p>
+                  </div>
+
+                  {/* Key Deliverables Pills Preview */}
+                  {service.deliverables && service.deliverables.length > 0 && (
+                    <div className="pt-4 border-t border-[#F2ECE1] flex flex-wrap gap-1.5">
+                      {service.deliverables.slice(0, 2).map((d) => (
+                        <span
+                          key={d}
+                          className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FAF8F5] text-[#666666] border border-[#E5E0D8]"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Footer: Clean interactive CTA button */}
+                <div className="pt-6 mt-6 border-t border-[#F2ECE1] flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase text-[#171717] font-bold tracking-wider group-hover:underline underline-offset-4">
+                    Explore Offering
                   </span>
-                </div>
 
-                {/* Title & Benefit */}
-                <div className="space-y-2.5">
-                  <h3 className="font-serif text-2xl font-bold text-[#171717] tracking-tight leading-snug group-hover:text-black transition-colors">
-                    {service.title}
-                  </h3>
-
-                  <p className="text-sm text-[#555555] leading-relaxed line-clamp-3">
-                    {service.shortBenefit}
-                  </p>
-                </div>
-
-                {/* Key Deliverables Pills Preview */}
-                {service.deliverables && service.deliverables.length > 0 && (
-                  <div className="pt-4 border-t border-[#F2ECE1] flex flex-wrap gap-1.5">
-                    {service.deliverables.slice(0, 2).map((d) => (
-                      <span
-                        key={d}
-                        className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#FAF8F5] text-[#666666] border border-[#E5E0D8]"
-                      >
-                        {d}
-                      </span>
-                    ))}
+                  <div className="w-8 h-8 rounded-full bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center text-[#171717] group-hover:bg-[#171717] group-hover:text-white group-hover:border-[#171717] group-hover:translate-x-1 transition-all duration-300">
+                    <ArrowUpRight className="w-4 h-4" />
                   </div>
-                )}
-              </div>
-
-              {/* Card Footer: Clean interactive CTA button */}
-              <div className="pt-6 mt-6 border-t border-[#F2ECE1] flex items-center justify-between">
-                <span className="text-xs font-mono uppercase text-[#171717] font-bold tracking-wider group-hover:underline underline-offset-4">
-                  Explore Offering
-                </span>
-
-                <div className="w-8 h-8 rounded-full bg-[#FAF8F5] border border-[#E5E0D8] flex items-center justify-center text-[#171717] group-hover:bg-[#171717] group-hover:text-white group-hover:border-[#171717] group-hover:translate-x-1 transition-all duration-300">
-                  <ArrowUpRight className="w-4 h-4" />
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 3. SELECTED WORK (Large editorial thumbnails + category labels) */}
@@ -199,8 +215,13 @@ export default async function HomePage() {
         </div>
 
         {/* Alternating Editorial Showcase */}
-        <div className="space-y-16">
-          {displayProjects.map((project, idx) => (
+        {displayProjects.length === 0 ? (
+          <div className="p-12 text-center rounded-2xl bg-white border border-[#E5E0D8]">
+            <p className="text-sm font-mono text-[#777777]">No case studies published yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-16">
+            {displayProjects.map((project, idx) => (
             <article
               key={project.id}
               className={`grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center ${
@@ -283,7 +304,8 @@ export default async function HomePage() {
               </div>
             </article>
           ))}
-        </div>
+          </div>
+        )}
       </section>
 
       {/* 4. PROCESS: Discover -> Build -> Launch -> Grow */}

@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { PortfolioHub } from "@/components/portfolio/PortfolioHub";
 import { getPortfolioProjects } from "@/lib/cms/store";
+
+export const instant = false;
 
 export const metadata: Metadata = {
   title: "Selected Work & Case Studies",
@@ -9,8 +12,8 @@ export const metadata: Metadata = {
     "Explore LaunchCraft's portfolio of verified client transformations across Branding, Websites, Marketing Strategy, SEO, and Launch Campaigns.",
 };
 
-
 export default async function WorkPage() {
+  await connection();
   const projects = await getPortfolioProjects({ onlyPublished: true });
 
   return (

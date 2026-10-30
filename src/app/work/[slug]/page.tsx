@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, ArrowRight, CheckCircle2 } from "lucide-react";
@@ -8,11 +9,6 @@ import { getProjectBySlug, getPortfolioProjects } from "@/lib/cms/store";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const projects = await getPortfolioProjects({ onlyPublished: true });
-  return projects.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -41,6 +37,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export const instant = false;
 
 export default async function ProjectDetailPage({ params }: PageProps) {
+  await connection();
   const { slug } = await params;
   const project = await getProjectBySlug(slug);
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLead } from "@/lib/cms/store";
+import { createBooking, createLead, getBookedSlotsForDate, getBookingSchedule } from "@/lib/cms/store";
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,13 +29,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Consent to policy is required." }, { status: 400 });
     }
 
-    const lead = await createLead({
+    // Check if date is blocked
+    const schedule = await getBookingSchedule();
+    if (schedule.blockedDates.includes(date)) {
+      return NextResponse.json(
+        { error: "The selected date is currently blocked and unavailable for booking." },
+        { status: 400 }
+      );
+    }
+
+    // Check if slot is already reserved
+    const bookedSlots = await getBookedSlotsForDate(date);
+    if (bookedSlots.includes(timeSlot)) {
+      return NextResponse.json(
+        { error: "This time slot has already been reserved. Please select an alternate slot or date." },
+        { status: 409 }
+      );
+    }
+
+    // 1. Create persistent Booking record in PostgreSQL
+    const booking = await createBooking({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      businessName: businessName?.trim() || null,
+      serviceInterest: serviceInterest || "Branding & Positioning",
+      date,
+      timeSlot,
+      timezone: timezone || "Europe/London (GMT/BST)",
+      notes: notes?.trim() || null,
+    });
+
+    // 2. Also log as a CRM Lead for seamless inquiry tracking
+    await createLead({
       type: "project_inquiry",
       name: name.trim(),
-      businessName: businessName?.trim(),
+      businessName: businessName?.trim() || null,
       email: email.trim().toLowerCase(),
-      selectedServices: serviceInterest ? [serviceInterest] : ["Consultation"],
-      description: `[BOOKING REQUEST] Scheduled Date: ${date} at ${timeSlot} (${timezone || "UTC"}). Notes: ${notes || "None"}`,
+      service: serviceInterest || "Consultation",
+      message: `[BOOKING CONFIRMED] Scheduled Date: ${date} at ${timeSlot} (${timezone || "UTC"}). Focus: ${serviceInterest || "General"}. Notes: ${notes || "None"}`,
+      status: "Qualified",
+      source: "consultation_scheduler",
       consentAccepted: true,
       consentTimestamp: new Date().toISOString(),
     });
@@ -43,11 +76,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        bookingId: lead.id,
+        bookingId: booking.id,
         appointment: {
-          date,
-          timeSlot,
-          timezone: timezone || "UTC",
+          date: booking.date,
+          timeSlot: booking.timeSlot,
+          timezone: booking.timezone,
         },
         message: "Your consultation request has been confirmed. A calendar invitation has been reserved.",
       },
@@ -61,4 +94,5 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
 
