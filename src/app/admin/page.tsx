@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { connection } from "next/server";
 import type { Metadata } from "next";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
@@ -11,8 +10,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function AdminPage() {
-  await connection();
+export default function AdminPage() {
   return (
     <Suspense
       fallback={

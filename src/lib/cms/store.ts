@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import prisma from "@/lib/prisma";
 import {
   CMSData,
@@ -19,135 +17,47 @@ import {
 } from "./types";
 import { initialCMSData } from "./initialData";
 
-const DATA_DIR = path.join(process.cwd(), "src", "data");
-const STORE_PATH = path.join(DATA_DIR, "cms-store.json");
-
-// Cache in memory for fast execution
+// In-memory cache for fast execution
 let memoryData: CMSData | null = null;
 
-function ensureDataFile(): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(STORE_PATH)) {
-    fs.writeFileSync(STORE_PATH, JSON.stringify(initialCMSData, null, 2), "utf8");
-  }
-}
-
 export async function getCMSData(): Promise<CMSData> {
-  let fileData: CMSData;
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    fileData = JSON.parse(raw) as CMSData;
-  } catch (error) {
-    console.error("Error reading CMS store file:", error);
-    fileData = JSON.parse(JSON.stringify(initialCMSData));
-  }
+  const [
+    services,
+    portfolio,
+    jobs,
+    applications,
+    leads,
+    bookings,
+    bookingSchedule,
+    subscribers,
+    settings,
+  ] = await Promise.all([
+    getServices(false).catch(() => []),
+    getPortfolioProjects({ onlyPublished: false }).catch(() => []),
+    getJobs(false).catch(() => []),
+    getApplications().catch(() => []),
+    getLeads().catch(() => []),
+    getBookings().catch(() => []),
+    getBookingSchedule().catch(() => initialCMSData.bookingSchedule),
+    getSubscribers().catch(() => []),
+    getSettings().catch(() => initialCMSData.settings),
+  ]);
 
-  // Load Services dynamically from PostgreSQL
-  try {
-    const dbServices = await getServices(false);
-    if (Array.isArray(dbServices)) {
-      fileData.services = dbServices;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load services from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Projects dynamically from PostgreSQL
-  try {
-    const dbProjects = await getPortfolioProjects({ onlyPublished: false });
-    if (Array.isArray(dbProjects)) {
-      fileData.portfolio = dbProjects;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load projects from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Jobs dynamically from PostgreSQL
-  try {
-    const dbJobs = await getJobs(false);
-    if (Array.isArray(dbJobs)) {
-      fileData.jobs = dbJobs;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load jobs from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Applications dynamically from PostgreSQL
-  try {
-    const dbApps = await getApplications();
-    if (Array.isArray(dbApps)) {
-      fileData.applications = dbApps;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load applications from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Leads dynamically from PostgreSQL
-  try {
-    const dbLeads = await getLeads();
-    if (Array.isArray(dbLeads)) {
-      fileData.leads = dbLeads;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load leads from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Bookings dynamically from PostgreSQL
-  try {
-    const dbBookings = await getBookings();
-    if (dbBookings) {
-      fileData.bookings = dbBookings;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load bookings from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load BookingSchedule dynamically from PostgreSQL
-  try {
-    const dbSchedule = await getBookingSchedule();
-    if (dbSchedule) {
-      fileData.bookingSchedule = dbSchedule;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load booking schedule from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Subscribers dynamically from PostgreSQL
-  try {
-    const dbSubscribers = await getSubscribers();
-    if (Array.isArray(dbSubscribers)) {
-      fileData.subscribers = dbSubscribers;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load subscribers from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  // Load Settings dynamically from PostgreSQL
-  try {
-    const dbSettings = await getSettings();
-    if (dbSettings) {
-      fileData.settings = dbSettings;
-    }
-  } catch (dbErr) {
-    console.warn("Could not load settings from PostgreSQL, fallback to local:", dbErr);
-  }
-
-  memoryData = fileData;
-  return fileData;
+  return {
+    services: Array.isArray(services) ? services : [],
+    portfolio: Array.isArray(portfolio) ? portfolio : [],
+    jobs: Array.isArray(jobs) ? jobs : [],
+    applications: Array.isArray(applications) ? applications : [],
+    leads: Array.isArray(leads) ? leads : [],
+    subscribers: Array.isArray(subscribers) ? subscribers : [],
+    bookings: Array.isArray(bookings) ? bookings : [],
+    bookingSchedule: bookingSchedule || initialCMSData.bookingSchedule,
+    settings: settings || initialCMSData.settings,
+  };
 }
 
-export async function saveCMSData(data: CMSData): Promise<void> {
-  try {
-    ensureDataFile();
-    memoryData = data;
-    fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), "utf8");
-  } catch (error) {
-    console.error("Error writing CMS store file:", error);
-    memoryData = data;
-  }
+export async function saveCMSData(_data: CMSData): Promise<void> {
+  // All CMS operations are committed directly to PostgreSQL via Prisma
 }
 
 // ----------------------------------------------------
@@ -294,23 +204,6 @@ export async function saveService(service: Service): Promise<Service> {
     };
   }
 
-  // Sync to local json file as well
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (!data.services) data.services = [];
-    const idx = data.services.findIndex((s: Service) => s.id === savedRecord.id || s.slug === savedRecord.slug);
-    if (idx >= 0) {
-      data.services[idx] = savedRecord;
-    } else {
-      data.services.push(savedRecord);
-    }
-    await saveCMSData(data);
-  } catch (err) {
-    console.warn("Could not sync saved service to cms-store.json:", err);
-  }
-
   return savedRecord;
 }
 
@@ -329,18 +222,6 @@ export async function deleteService(id: string): Promise<void> {
     }
   }
 
-  // Also remove from local json file
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (data.services) {
-      data.services = data.services.filter((s: Service) => s.id !== id && s.slug !== id);
-      await saveCMSData(data);
-    }
-  } catch (err) {
-    console.warn("Could not remove service from cms-store.json:", err);
-  }
 }
 
 // ----------------------------------------------------
@@ -648,23 +529,6 @@ export async function saveJob(job: Job): Promise<Job> {
     };
   }
 
-  // Sync to local json file as well
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (!data.jobs) data.jobs = [];
-    const idx = data.jobs.findIndex((j: Job) => j.id === savedRecord.id || j.slug === savedRecord.slug);
-    if (idx >= 0) {
-      data.jobs[idx] = savedRecord;
-    } else {
-      data.jobs.push(savedRecord);
-    }
-    await saveCMSData(data);
-  } catch (err) {
-    console.warn("Could not sync saved job to cms-store.json:", err);
-  }
-
   return savedRecord;
 }
 
@@ -683,18 +547,6 @@ export async function deleteJob(id: string): Promise<void> {
     }
   }
 
-  // Also remove from local json file
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (data.jobs) {
-      data.jobs = data.jobs.filter((j: Job) => j.id !== id && j.slug !== id);
-      await saveCMSData(data);
-    }
-  } catch (err) {
-    console.warn("Could not remove job from cms-store.json:", err);
-  }
 }
 
 // ----------------------------------------------------
@@ -763,24 +615,7 @@ export async function getApplications(options?: {
     console.error("Error fetching applications from PostgreSQL:", error);
   }
 
-  // Fallback to local json file
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    let list: Application[] = data.applications || [];
-    if (options?.jobId) {
-      list = list.filter((a) => a.jobId === options.jobId);
-    }
-    if (options?.status) {
-      list = list.filter((a) => a.status === options.status);
-    }
-    return list.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 export async function getApplicationById(id: string): Promise<Application | null> {
@@ -899,18 +734,6 @@ export async function createApplication(
     };
   }
 
-  // Sync to local json file as well
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (!data.applications) data.applications = [];
-    data.applications.unshift(createdApp);
-    await saveCMSData(data);
-  } catch (err) {
-    console.warn("Could not sync created application to cms-store.json:", err);
-  }
-
   return createdApp;
 }
 
@@ -952,23 +775,6 @@ export async function updateApplicationStatus(
     console.warn("Database updateApplicationStatus error, checking local store:", dbError);
   }
 
-  // Also update local file
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (data.applications) {
-      const idx = data.applications.findIndex((a: Application) => a.id === id);
-      if (idx >= 0) {
-        data.applications[idx].status = status;
-        if (!updatedApp) updatedApp = data.applications[idx];
-        await saveCMSData(data);
-      }
-    }
-  } catch (err) {
-    console.warn("Could not sync status update to cms-store.json:", err);
-  }
-
   return updatedApp;
 }
 
@@ -981,18 +787,6 @@ export async function deleteApplication(id: string): Promise<void> {
     console.warn("Could not delete application from PostgreSQL:", id, dbError);
   }
 
-  // Also remove from local json file
-  try {
-    ensureDataFile();
-    const raw = fs.readFileSync(STORE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    if (data.applications) {
-      data.applications = data.applications.filter((a: Application) => a.id !== id);
-      await saveCMSData(data);
-    }
-  } catch (err) {
-    console.warn("Could not remove application from cms-store.json:", err);
-  }
 }
 
 // ----------------------------------------------------

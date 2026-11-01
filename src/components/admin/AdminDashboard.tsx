@@ -23,6 +23,7 @@ import {
   X,
   Star,
   Eye,
+  EyeOff,
   ChevronRight,
   TrendingUp,
   FileSpreadsheet,
@@ -35,6 +36,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { CMSData, Service, Job, PortfolioProject, Booking, BookingSchedule, SiteSettings } from "@/lib/cms/types";
+import { api, getApiErrorMessage } from "@/lib/api";
 
 type AdminTab =
   | "overview"
@@ -49,7 +51,10 @@ type AdminTab =
 
 export function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
-  const [passkey, setPasskey] = React.useState("");
+  const [adminEmail, setAdminEmail] = React.useState("");
+  const [adminPassword, setAdminPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [currentAdminUser, setCurrentAdminUser] = React.useState<{ name?: string | null; email?: string } | null>(null);
   const [authError, setAuthError] = React.useState<string | null>(null);
   const [authLoading, setAuthLoading] = React.useState(false);
 
@@ -58,6 +63,27 @@ export function AdminDashboard() {
   const [loadingData, setLoadingData] = React.useState(false);
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+
+  // Global action confirmation popup modal state
+  interface ActionModalState {
+    isOpen: boolean;
+    type: "success" | "error" | "info";
+    title: string;
+    message: string;
+    actionName?: string;
+    timestamp?: string;
+  }
+  const [actionModal, setActionModal] = React.useState<ActionModalState | null>(null);
+
+  // Auto-dismiss popup after 6 seconds if not manually closed
+  React.useEffect(() => {
+    if (actionModal?.isOpen) {
+      const timer = setTimeout(() => {
+        setActionModal(null);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [actionModal]);
 
   // Search filter inside active tab
   const [searchFilter, setSearchFilter] = React.useState("");
@@ -503,11 +529,17 @@ export function AdminDashboard() {
 
   const checkAuth = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/data");
-      if (res.ok) {
-        const data = await res.json();
-        setCmsData(data);
+      const [dataRes, authRes] = await Promise.all([
+        api.get<CMSData>("/admin/data"),
+        api.get<{ authenticated: boolean; user?: { name?: string | null; email?: string } }>("/admin/auth"),
+      ]);
+
+      if (dataRes.data) {
+        setCmsData(dataRes.data);
         setIsAuthenticated(true);
+        if (authRes.data?.user) {
+          setCurrentAdminUser(authRes.data.user);
+        }
       } else {
         setIsAuthenticated(false);
       }
@@ -522,53 +554,82 @@ export function AdminDashboard() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!adminEmail.trim() || !adminPassword) {
+      setAuthError("Please provide both admin email and password.");
+      return;
+    }
+
     setAuthLoading(true);
     setAuthError(null);
 
     try {
-      const res = await fetch("/api/admin/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passkey }),
+      const res = await api.post<{ success: boolean; user?: { name?: string | null; email?: string } }>("/admin/auth", {
+        email: adminEmail.trim(),
+        password: adminPassword,
       });
 
-      if (res.ok) {
+      if (res.data?.success) {
+        if (res.data.user) {
+          setCurrentAdminUser(res.data.user);
+        }
         setIsAuthenticated(true);
         await checkAuth();
       } else {
-        const data = await res.json();
-        setAuthError(data.error || "Authentication failed. Please verify credentials.");
+        setAuthError("Authentication failed. Please verify credentials.");
       }
-    } catch {
-      setAuthError("Network connection error.");
+    } catch (err: unknown) {
+      setAuthError(getApiErrorMessage(err, "Authentication failed. Please verify credentials."));
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch("/api/admin/auth", { method: "DELETE" });
+    try {
+      await api.delete("/admin/auth");
+    } catch {
+      // Ignore
+    }
     setIsAuthenticated(false);
     setCmsData(null);
+    setCurrentAdminUser(null);
   };
 
   const performAction = async (action: string, payload: unknown, successMsg: string) => {
     try {
       setLoadingData(true);
-      const res = await fetch("/api/admin/data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, payload }),
-      });
+      const res = await api.post<{ data?: CMSData }>("/admin/data", { action, payload });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.data) setCmsData(data.data);
+      if (res.data?.data) {
+        setCmsData(res.data.data);
         setActionSuccess(successMsg);
         setTimeout(() => setActionSuccess(null), 3000);
+
+        const formattedAction = action
+          .split("_")
+          .map((w) => w.toUpperCase())
+          .join(" ");
+
+        setActionModal({
+          isOpen: true,
+          type: "success",
+          title: "Operation Successful",
+          message: successMsg,
+          actionName: formattedAction,
+          timestamp: new Date().toLocaleTimeString(),
+        });
       }
     } catch (err) {
       console.error("Admin action failed:", err);
+      const errMsg = getApiErrorMessage(err, "Failed to perform administrative operation.");
+      setActionModal({
+        isOpen: true,
+        type: "error",
+        title: "Operation Failed",
+        message: errMsg,
+        actionName: action.toUpperCase(),
+        timestamp: new Date().toLocaleTimeString(),
+      });
     } finally {
       setLoadingData(false);
     }
@@ -576,7 +637,17 @@ export function AdminDashboard() {
 
   // Export Subscribers as CSV
   const exportSubscribersCSV = () => {
-    if (!cmsData?.subscribers) return;
+    if (!cmsData?.subscribers || cmsData.subscribers.length === 0) {
+      setActionModal({
+        isOpen: true,
+        type: "info",
+        title: "Export Subscribers",
+        message: "No newsletter subscribers found in the database to export.",
+        actionName: "EXPORT CSV",
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      return;
+    }
     const header = "Email,Source,Status,Created At\n";
     const rows = cmsData.subscribers
       .map((s) => `"${s.email}","${s.source}","${s.status}","${s.createdAt}"`)
@@ -584,11 +655,21 @@ export function AdminDashboard() {
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+    const filename = `LaunchCraft_Subscribers_${Date.now()}.csv`;
     link.href = url;
-    link.setAttribute("download", `LaunchCraft_Subscribers_${Date.now()}.csv`);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    setActionModal({
+      isOpen: true,
+      type: "success",
+      title: "Subscribers Exported",
+      message: `Downloaded ${cmsData.subscribers.length} newsletter subscriber records to ${filename}.`,
+      actionName: "EXPORT SUBSCRIBERS CSV",
+      timestamp: new Date().toLocaleTimeString(),
+    });
   };
 
   if (isAuthenticated === null) {
@@ -605,58 +686,106 @@ export function AdminDashboard() {
   // Login Screen
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#141414] p-4">
-        <div className="w-full max-w-md rounded-2xl bg-[#1E1E1E] border border-[#2E2E2E] p-8 sm:p-10 text-[#F5F1E9] space-y-6 shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-xl bg-white text-[#171717] flex items-center justify-center mx-auto shadow-md">
+      <div className="min-h-screen flex items-center justify-center bg-[#111111] p-4 text-[#F5F1E9] selection:bg-white selection:text-black">
+        <div className="w-full max-w-md rounded-2xl bg-[#1A1A1A] border border-[#2E2E2E] p-8 sm:p-10 shadow-2xl relative overflow-hidden">
+          {/* Subtle top ambient glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+          <div className="text-center space-y-2.5 mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-white text-[#171717] flex items-center justify-center mx-auto shadow-lg mb-3">
               <Lock className="w-6 h-6" />
             </div>
             <h1 className="font-serif text-2xl sm:text-3xl font-black text-white tracking-tight">
               LAUNCHCRAFT
             </h1>
-            <p className="text-xs font-mono text-[#888888] uppercase tracking-widest">
-              CMS Operations Console
-            </p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#242424] border border-[#333333] text-[11px] font-mono text-[#AAAAAA] uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              PostgreSQL User Authentication
+            </div>
           </div>
 
           {authError && (
-            <div className="p-3.5 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200">
-              {authError}
+            <div className="p-3.5 mb-6 rounded-lg bg-red-950/60 border border-red-800 text-xs text-red-200 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+              <span>{authError}</span>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-mono text-[#CCCCCC]">
-                Master Administrator Passkey
+              <label className="block text-xs font-mono uppercase tracking-wider text-[#CCCCCC]">
+                Admin Email
               </label>
-              <input
-                type="password"
-                required
-                value={passkey}
-                onChange={(e) => setPasskey(e.target.value)}
-                placeholder="Enter passkey (e.g. launchcraft2026)"
-                className="w-full h-12 px-4 rounded-lg bg-[#2A2A2A] border border-[#3E3E3E] text-sm text-white placeholder:text-[#666666] focus-visible:outline-none focus-visible:border-white focus-visible:ring-1 focus-visible:ring-white transition-colors"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  required
+                  autoComplete="username"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="admin@launchcraft.agency"
+                  className="w-full h-12 pl-10 pr-4 rounded-lg bg-[#242424] border border-[#3A3A3A] text-sm text-white placeholder:text-[#666666] focus-visible:outline-none focus-visible:border-white focus-visible:ring-1 focus-visible:ring-white transition-colors"
+                />
+                <Mail className="w-4 h-4 text-[#777777] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-mono uppercase tracking-wider text-[#CCCCCC]">
+                Admin Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full h-12 pl-10 pr-11 rounded-lg bg-[#242424] border border-[#3A3A3A] text-sm text-white placeholder:text-[#666666] focus-visible:outline-none focus-visible:border-white focus-visible:ring-1 focus-visible:ring-white transition-colors"
+                />
+                <Lock className="w-4 h-4 text-[#777777] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#777777] hover:text-white transition-colors cursor-pointer p-1"
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full h-12 rounded-lg bg-white text-[#171717] font-mono uppercase text-xs tracking-wider font-bold hover:bg-[#E5E0D8] transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full h-12 mt-2 rounded-lg bg-white text-[#171717] font-mono uppercase text-xs tracking-wider font-bold hover:bg-[#E5E0D8] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {authLoading ? "Authorizing..." : "Unlock Dashboard"}
+              {authLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Verifying Credentials...</span>
+                </>
+              ) : (
+                <span>Authenticate & Unlock</span>
+              )}
             </button>
           </form>
 
-          <div className="p-3 rounded-lg bg-[#262626] border border-[#333333] text-center text-xs font-mono text-[#888888]">
-            Default passkey: <span className="text-white font-bold">launchcraft2026</span>
+          <div className="mt-6 p-3 rounded-lg bg-[#202020] border border-[#2D2D2D] text-left text-[11px] font-mono text-[#888888] space-y-1">
+            <div className="flex items-center gap-1.5 text-white font-medium text-xs">
+              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Configured via .env</span>
+            </div>
+            <p className="leading-relaxed">
+              Credentials are loaded from <code className="text-[#CCCCCC]">ADMIN_NAME</code>, <code className="text-[#CCCCCC]">ADMIN_EMAIL</code>, and <code className="text-[#CCCCCC]">ADMIN_PASSWORD</code> in your <code className="text-white">.env</code> file and securely stored in the PostgreSQL <code className="text-white">User</code> model.
+            </p>
           </div>
 
-          <div className="text-center">
+          <div className="mt-6 text-center">
             <Link
               href="/"
-              className="text-xs font-mono text-[#777777] hover:text-white underline underline-offset-2"
+              className="text-xs font-mono text-[#777777] hover:text-white underline underline-offset-2 transition-colors"
             >
               &larr; Return to Public Website
             </Link>
@@ -800,10 +929,17 @@ export function AdminDashboard() {
           </a>
 
           <div className="flex items-center justify-between px-2 text-[11px] font-mono text-[#777777]">
-            <span>Master Admin</span>
+            <div className="truncate max-w-[150px]">
+              <span className="text-white font-medium block truncate">
+                {currentAdminUser?.name || "Administrator"}
+              </span>
+              <span className="text-[10px] text-[#888888] block truncate">
+                {currentAdminUser?.email || "admin"}
+              </span>
+            </div>
             <button
               onClick={handleLogout}
-              className="text-[#999999] hover:text-red-400 flex items-center gap-1 cursor-pointer transition-colors"
+              className="text-[#999999] hover:text-red-400 flex items-center gap-1 cursor-pointer transition-colors shrink-0"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -3669,6 +3805,110 @@ export function AdminDashboard() {
           )}
           </main>
       </div>
+
+      {/* ================================================================= */}
+      {/* ACTION FEEDBACK POPUP MODAL (Displays after every CRUD/action)   */}
+      {/* ================================================================= */}
+      {actionModal?.isOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setActionModal(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-md bg-[#181818] border border-[#2E2E2E] rounded-2xl shadow-2xl p-6 sm:p-7 text-[#F5F1E9] space-y-5 relative overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top gradient highlight based on type */}
+            <div
+              className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
+                actionModal.type === "success"
+                  ? "from-emerald-500 via-teal-400 to-emerald-500"
+                  : actionModal.type === "error"
+                  ? "from-rose-500 via-red-400 to-rose-500"
+                  : "from-blue-500 via-sky-400 to-blue-500"
+              }`}
+            />
+
+            {/* Header with Icon, Title, and Close Button */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
+                    actionModal.type === "success"
+                      ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-400"
+                      : actionModal.type === "error"
+                      ? "bg-red-950/80 border border-red-500/40 text-red-400"
+                      : "bg-blue-950/80 border border-blue-500/40 text-blue-400"
+                  }`}
+                >
+                  {actionModal.type === "success" ? (
+                    <CheckCircle2 className="w-6 h-6" />
+                  ) : actionModal.type === "error" ? (
+                    <AlertCircle className="w-6 h-6" />
+                  ) : (
+                    <Clock className="w-6 h-6" />
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-serif text-lg font-bold text-white tracking-tight">
+                    {actionModal.title}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {actionModal.actionName && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#242424] border border-[#333333] text-[#AAAAAA] uppercase font-semibold">
+                        {actionModal.actionName}
+                      </span>
+                    )}
+                    {actionModal.timestamp && (
+                      <span className="text-[10px] font-mono text-[#666666]">
+                        {actionModal.timestamp}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActionModal(null)}
+                className="p-1.5 rounded-lg text-[#777777] hover:text-white hover:bg-[#262626] transition-colors cursor-pointer"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Message Body Box */}
+            <div className="p-4 rounded-xl bg-[#222222] border border-[#2F2F2F] space-y-2">
+              <p className="text-xs sm:text-sm text-[#DDDDDD] leading-relaxed">
+                {actionModal.message}
+              </p>
+
+              <div className="flex items-center justify-between pt-2 border-t border-[#2C2C2C] text-[11px] font-mono text-[#888888]">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  PostgreSQL DB Synced
+                </span>
+                <span className="text-[#666666]">Real-time persistence</span>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="flex items-center justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setActionModal(null)}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-white text-[#171717] font-mono text-xs uppercase tracking-wider font-bold hover:bg-[#E5E0D8] transition-colors cursor-pointer shadow-sm text-center"
+              >
+                Acknowledged &times;
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

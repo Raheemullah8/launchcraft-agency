@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { SiteSettings } from "@/lib/cms/types";
+import { api } from "@/lib/api";
 
 interface SettingsContextValue {
   settings: SiteSettings | null;
@@ -18,12 +19,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSettings = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/settings");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.settings) {
-          setSettings(data.settings);
-        }
+      const res = await api.get<{ settings?: SiteSettings }>("/settings");
+      if (res.data?.settings) {
+        setSettings(res.data.settings);
       }
     } catch (err) {
       console.warn("Could not fetch site settings:", err);

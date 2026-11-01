@@ -54,45 +54,43 @@ export function ConsultationScheduler() {
     async function loadSchedule() {
       try {
         setLoadingSchedule(true);
-        const res = await fetch("/api/book/schedule", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.schedule) {
-            setSchedule(data.schedule);
-            
-            // Generate available dates from workingDays & blockedDates
-            const workingDays = Array.isArray(data.schedule.workingDays) && data.schedule.workingDays.length > 0
-              ? data.schedule.workingDays
-              : [1, 2, 3, 4, 5];
-            const blocked = Array.isArray(data.schedule.blockedDates) ? data.schedule.blockedDates : [];
-            const maxDays = data.schedule.maxAdvanceDays || 14;
+        const res = await api.get<{ schedule?: BookingSchedule }>("/book/schedule");
+        if (res.data?.schedule) {
+          const scheduleData = res.data.schedule;
+          setSchedule(scheduleData);
+          
+          // Generate available dates from workingDays & blockedDates
+          const workingDays = Array.isArray(scheduleData.workingDays) && scheduleData.workingDays.length > 0
+            ? scheduleData.workingDays
+            : [1, 2, 3, 4, 5];
+          const blocked = Array.isArray(scheduleData.blockedDates) ? scheduleData.blockedDates : [];
+          const maxDays = scheduleData.maxAdvanceDays || 14;
 
-            const dates: { dateStr: string; label: string; dayName: string }[] = [];
-            const current = new Date();
-            current.setDate(current.getDate() + 1); // Start from tomorrow
+          const dates: { dateStr: string; label: string; dayName: string }[] = [];
+          const current = new Date();
+          current.setDate(current.getDate() + 1); // Start from tomorrow
 
-            const limit = Math.min(Math.max(maxDays, 5), 14);
-            let attempts = 0;
-            while (dates.length < limit && attempts < maxDays + 30) {
-              attempts++;
-              const dayOfWeek = current.getDay();
-              const yyyy = current.getFullYear();
-              const mm = String(current.getMonth() + 1).padStart(2, "0");
-              const dd = String(current.getDate()).padStart(2, "0");
-              const dateStr = `${yyyy}-${mm}-${dd}`;
+          const limit = Math.min(Math.max(maxDays, 5), 14);
+          let attempts = 0;
+          while (dates.length < limit && attempts < maxDays + 30) {
+            attempts++;
+            const dayOfWeek = current.getDay();
+            const yyyy = current.getFullYear();
+            const mm = String(current.getMonth() + 1).padStart(2, "0");
+            const dd = String(current.getDate()).padStart(2, "0");
+            const dateStr = `${yyyy}-${mm}-${dd}`;
 
-              if (workingDays.includes(dayOfWeek) && !blocked.includes(dateStr)) {
-                const dayName = current.toLocaleDateString("en-US", { weekday: "short" });
-                const label = current.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                dates.push({ dateStr, label, dayName });
-              }
-              current.setDate(current.getDate() + 1);
+            if (workingDays.includes(dayOfWeek) && !blocked.includes(dateStr)) {
+              const dayName = current.toLocaleDateString("en-US", { weekday: "short" });
+              const label = current.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              dates.push({ dateStr, label, dayName });
             }
+            current.setDate(current.getDate() + 1);
+          }
 
-            setAvailableDates(dates);
-            if (dates.length > 0) {
-              setSelectedDate(dates[0].dateStr);
-            }
+          setAvailableDates(dates);
+          if (dates.length > 0) {
+            setSelectedDate(dates[0].dateStr);
           }
         }
       } catch (err) {
@@ -109,11 +107,10 @@ export function ConsultationScheduler() {
     if (!selectedDate) return;
     async function fetchBookedSlots() {
       try {
-        const res = await fetch(`/api/book/schedule?date=${selectedDate}`, { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          setBookedSlots(Array.isArray(data.bookedSlots) ? data.bookedSlots : []);
-        }
+        const res = await api.get<{ bookedSlots?: string[] }>("/book/schedule", {
+          params: { date: selectedDate },
+        });
+        setBookedSlots(Array.isArray(res.data?.bookedSlots) ? res.data.bookedSlots : []);
       } catch (err) {
         console.warn("Failed to check booked slots for date:", err);
       }

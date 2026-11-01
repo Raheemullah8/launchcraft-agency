@@ -1,13 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowUpRight, Star } from "lucide-react";
 import { useSiteSettings } from "@/context/SettingsContext";
 
 export function Footer() {
   const { settings } = useSiteSettings();
+  const [currentYear, setCurrentYear] = useState(2026);
 
-  const currentYear = new Date().getFullYear();
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   const agencyName = settings?.agencyName || "LAUNCHCRAFT";
   const tagline = settings?.tagline || "From Idea to Impact.";
   const email = settings?.email || "inquiries@launchcraft.agency";

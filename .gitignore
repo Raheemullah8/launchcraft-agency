@@ -42,3 +42,15 @@ next-env.d.ts
 !/storage/private/cvs/.gitkeep
 
 /src/generated/prisma
+.neon
+
+# Environment variables & secrets (Never push to GitHub)
+.env
+.env*
+!.env.example
+
+
+# Agent workspace configurations & skills
+.agents/
+.claude/
+.windsurf/

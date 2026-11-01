@@ -22,7 +22,22 @@ async function main() {
   });
 
   if (existing) {
-    console.log(`Admin user (${adminEmail}) already exists.`);
+    const isPasswordSame = await bcrypt.compare(adminPassword, existing.password);
+    const isNameSame = existing.name === adminName;
+    if (!isPasswordSame || !isNameSame) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      await prisma.user.update({
+        where: { email: adminEmail },
+        data: {
+          name: adminName,
+          password: hashedPassword,
+          role: "ADMIN",
+        },
+      });
+      console.log(`Admin user (${adminEmail}) credentials updated from .env!`);
+    } else {
+      console.log(`Admin user (${adminEmail}) is already up to date.`);
+    }
     return;
   }
 
